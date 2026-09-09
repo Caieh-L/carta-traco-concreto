@@ -1,5 +1,6 @@
 """
-Módulo de Geração de Relatórios Técnicos e Fichas Operacionais em PDF
+Módulo de Impressão PDF - Fichas Operacionais e Dossiê Técnico
+Com alinhamento rigoroso e Bloco de Assinatura do Responsável Técnico
 """
 
 import io
@@ -8,6 +9,48 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
+def criar_bloco_assinatura(dados_obra: dict, styles) -> List:
+    elementos = []
+    elementos.append(Spacer(1, 15))
+    elementos.append(Paragraph("<b>4. Responsabilidade Técnica e Identificação da Obra</b>", styles['Heading2']))
+    elementos.append(Spacer(1, 8))
+
+    obra = dados_obra.get("nome_obra", "Não Informada")
+    prop = dados_obra.get("proprietario", "Não Informado")
+    resp = dados_obra.get("responsavel_tecnico", "Engenheiro / Arquiteto Responsável")
+    crea = dados_obra.get("registro_prof", "CREA/CAU N° ---")
+    art = dados_obra.get("art_rrt", "ART/RRT N° ---")
+
+    t_data = [
+        [Paragraph(f"<b>Obra:</b> {obra}", styles['Normal']), Paragraph(f"<b>Proprietário:</b> {prop}", styles['Normal'])],
+        [Paragraph(f"<b>Responsável Técnico:</b> {resp}", styles['Normal']), Paragraph(f"<b>Registro:</b> {crea}", styles['Normal'])],
+        [Paragraph(f"<b>ART/RRT:</b> {art}", styles['Normal']), Paragraph("<b>Data:</b> ____/____/2026", styles['Normal'])]
+    ]
+
+    t_info = Table(t_data, colWidths=[270, 270])
+    t_info.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elementos.append(t_info)
+    elementos.append(Spacer(1, 25))
+
+    # Campo de Assinatura
+    t_sig = Table([
+        ["__________________________________________________", "__________________________________________________"],
+        [f"{resp}", "Fiscalização / Controle Tecnológico"],
+        [f"{crea} | ART: {art}", "Visto do Responsável da Obra"]
+    ], colWidths=[270, 270])
+    t_sig.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('TEXTCOLOR', (0,0), (-1,-1), colors.HexColor('#334155')),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    elementos.append(t_sig)
+    return elementos
 
 def gerar_pdf_canteiro(dados: dict) -> bytes:
     buffer = io.BytesIO()
@@ -16,59 +59,52 @@ def gerar_pdf_canteiro(dados: dict) -> bytes:
 
     elements = []
 
-    # Título Principal
-    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#1E3A8A'), alignment=1)
-    elements.append(Paragraph("🏗️ FICHA OPERACIONAL DE CANTEIRO - DOSAGEM", titulo_style))
-    elements.append(Spacer(1, 10))
-    elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#1E3A8A')))
-    elements.append(Spacer(1, 15))
-
-    # Tabela de Mistura por Saco de Cimento
-    sub_style = ParagraphStyle('Sub', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#0F172A'))
-    elements.append(Paragraph("📋 Receita Prática por Saco de Cimento (50 kg)", sub_style))
+    title_style = ParagraphStyle('T1', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#1E3A8A'), alignment=0)
+    elements.append(Paragraph("FICHA OPERACIONAL DE CANTEIRO — MISTURA DE CONCRETO", title_style))
+    elements.append(Paragraph("Orientações Práticas de Dosagem | Conforme NBR 12655 e NR-17", ParagraphStyle('Sub', parent=styles['Normal'], textColor=colors.HexColor('#64748B'))))
     elements.append(Spacer(1, 8))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A')))
+    elements.append(Spacer(1, 12))
 
-    dosagem_saco = dados["dosagem_por_saco_50kg"]
-    tabela_data = [
-        ["Material", "Quantidade Operacional", "Recipiente Padronizado"],
-        ["Cimento Portland", "1 Saco (50 kg)", "Saco Fechado"],
-        ["Areia Lavada", f"{dosagem_saco['padiolas_areia_nr17']} Padiolas", "Padiola NR-17 (36.2 Litros)"],
-        ["Brita / Seixo", f"{dosagem_saco['padiolas_brita_nr17']} Padiolas", "Padiola NR-17 (36.2 Litros)"],
-        ["Água Limpa a Adicionar", f"{dosagem_saco['agua_litros_balde']} Litros", "Balde Graduado (Corrigido por Umidade)"]
+    saco = dados["dosagem_saco_50kg"]
+    t_data = [
+        [Paragraph("<b>Componente</b>", styles['Normal']), Paragraph("<b>Quantidade por Saco de Cimento (50 kg)</b>", styles['Normal']), Paragraph("<b>Recipiente Medidor</b>", styles['Normal'])],
+        [Paragraph("Cimento Portland", styles['Normal']), Paragraph("1 Saco Fechado (50 kg)", styles['Normal']), Paragraph("Embalagem de Fábrica", styles['Normal'])],
+        [Paragraph("Areia Lavada", styles['Normal']), Paragraph(f"<b>{saco['padiolas_areia']} Padiolas</b>", styles['Normal']), Paragraph("Padiola NR-17 (36.2 Litros)", styles['Normal'])],
+        [Paragraph("Brita / Seixo", styles['Normal']), Paragraph(f"<b>{saco['padiolas_brita']} Padiolas</b>", styles['Normal']), Paragraph("Padiola NR-17 (36.2 Litros)", styles['Normal'])],
+        [Paragraph("Água Limpa Efetiva", styles['Normal']), Paragraph(f"<b>{saco['agua_litros']} Litros</b>", styles['Normal']), Paragraph("Balde Graduado (Já descontada a chuva)", styles['Normal'])]
     ]
 
-    t = Table(tabela_data, colWidths=[180, 160, 180])
+    t = Table(t_data, colWidths=[150, 190, 200])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2563EB')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E1')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8FAFC')]),
-        ('ALIGN', (1,0), (-1,-1), 'CENTER'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
     ]))
     elements.append(t)
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 15))
 
-    # Recomendações do Canteiro
-    elements.append(Paragraph("⚠️ Orientações de Aplicação e Cura", sub_style))
-    elements.append(Spacer(1, 8))
-
-    dicas = [
-        "<b>Ordem de Colocação na Betoneira:</b> 1º Toda a água e aditivo -> 2º Todo o agregado graúdo (brita) -> 3º Todo o cimento -> 4º Por último, a areia aos poucos.",
-        "<b>Tempo de Mistura:</b> Manter a betoneira girando por no mínimo 3 minutos após a inserção do último componente.",
-        "<b>Cura Hidráulica:</b> Iniciar a molhagem contínua da peça 2 horas após a concretagem e manter por pelo menos 7 dias consecutivos."
+    elements.append(Paragraph("<b>Procedimento de Mistura na Betoneira:</b>", styles['Heading2']))
+    recom = [
+        "1. Adicionar 80% da água limpa e todo o aditivo (se especificado).",
+        "2. Adicionar 100% da brita/seixo e girar a betoneira por 1 minuto para lavar as pás.",
+        "3. Adicionar 100% do cimento Portland.",
+        "4. Adicionar 100% da areia aos poucos e completar com o restante da água.",
+        "5. Manter a betoneira girando por no mínimo 3 minutos antes de descarregar."
     ]
+    for r in recom:
+        elements.append(Paragraph(r, styles['Normal']))
+        elements.append(Spacer(1, 3))
 
-    for dica in dicas:
-        elements.append(Paragraph(f"• {dica}", styles['BodyText']))
-        elements.append(Spacer(1, 5))
+    elements.extend(criar_bloco_assinatura(dados.get("dados_obra", {}), styles))
 
     doc.build(elements)
     buffer.seek(0)
     return buffer.getvalue()
-
 
 def gerar_pdf_tecnico(dados: dict) -> bytes:
     buffer = io.BytesIO()
@@ -77,75 +113,72 @@ def gerar_pdf_tecnico(dados: dict) -> bytes:
 
     elements = []
 
-    # Título do Relatório
-    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=20, textColor=colors.HexColor('#0F172A'), alignment=0)
-    elements.append(Paragraph("DOSSIÊ TÉCNICO DE DOSAGEM DE CONCRETO", titulo_style))
-    elements.append(Paragraph("MEMORIAL DE CÁLCULO E ESPECIFICAÇÃO NORMATIVA", ParagraphStyle('Subhead', parent=styles['Normal'], textColor=colors.HexColor('#64748B'))))
-    elements.append(Spacer(1, 10))
-    elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#0F172A')))
-    elements.append(Spacer(1, 15))
-
-    # Tabela de Parâmetros Normativos
-    elements.append(Paragraph("1. Parâmetros do Projeto e Dosagem Científica", styles['Heading2']))
+    title_style = ParagraphStyle('T1', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#0F172A'), alignment=0)
+    elements.append(Paragraph("DOSSIÊ TÉCNICO DE DOSAGEM DE CONCRETO E PROJETO", title_style))
+    elements.append(Paragraph("Memorial de Cálculo Científico — NBR 6118, NBR 12655 e NBR 8953", ParagraphStyle('Sub', parent=styles['Normal'], textColor=colors.HexColor('#64748B'))))
     elements.append(Spacer(1, 8))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A')))
+    elements.append(Spacer(1, 12))
 
-    param_data = [
-        ["Parâmetro Normativo", "Valor Especificado", "Referência / Norma"],
-        ["Resistência Característica (fck)", f"{dados['fck']} MPa", "NBR 6118"],
-        ["Desvio Padrão de Dosagem (sd)", f"{dados['sd']} MPa", "NBR 12655"],
-        ["Resistência Média aos 28 dias (fcm28)", f"{dados['fcm28']} MPa", "Lei de Abrams"],
-        ["Relação Água / Cimento (a/c)", f"{dados['relacao_ac']}", "Durabilidade NBR 6118"],
-        ["Traço Seco em Massa (1 : a : b)", f"{dados['traco_seco']}", "Método ABCP/IPT"]
+    elements.append(Paragraph("<b>1. Parâmetros de Projeto e Correlações Normativas</b>", styles['Heading2']))
+    elements.append(Spacer(1, 6))
+
+    p_data = [
+        [Paragraph("<b>Parâmetro</b>", styles['Normal']), Paragraph("<b>Valor Especificado</b>", styles['Normal']), Paragraph("<b>Fundamento Normativo</b>", styles['Normal'])],
+        [Paragraph("Resistência Característica (fck)", styles['Normal']), Paragraph(f"{dados['fck']} MPa", styles['Normal']), Paragraph("NBR 8953 / NBR 6118", styles['Normal'])],
+        [Paragraph("Desvio Padrão de Dosagem (sd)", styles['Normal']), Paragraph(f"{dados['sd']} MPa", styles['Normal']), Paragraph("NBR 12655", styles['Normal'])],
+        [Paragraph("Resistência Média aos 28 Dias (fcm28)", styles['Normal']), Paragraph(f"{dados['fcm28']} MPa", styles['Normal']), Paragraph("Lei de Abrams (fcm = fck + 1.65*sd)", styles['Normal'])],
+        [Paragraph("Relação Água / Cimento (a/c)", styles['Normal']), Paragraph(f"{dados['relacao_ac']}", styles['Normal']), Paragraph("Durabilidade e Agressividade NBR 6118", styles['Normal'])],
+        [Paragraph("Traço Seco em Massa", styles['Normal']), Paragraph(f"{dados['traco_seco']}", styles['Normal']), Paragraph("Método ABCP / IPT", styles['Normal'])]
     ]
 
-    t = Table(param_data, colWidths=[200, 140, 180])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0F172A')),
+    t_p = Table(p_data, colWidths=[180, 160, 200])
+    t_p.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E293B')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8FAFC')]),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]))
-    elements.append(t)
-    elements.append(Spacer(1, 20))
+    elements.append(t_p)
+    elements.append(Spacer(1, 12))
 
-    # Consumo Consolidado por m³
-    elements.append(Paragraph("2. Consumo de Materiais por Metro Cúbico (m³)", styles['Heading2']))
-    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("<b>2. Consumo Consolidado de Materiais por Metro Cúbico (m³)</b>", styles['Heading2']))
+    elements.append(Spacer(1, 6))
 
-    consumo = dados["consumo_m3"]
-    consumo_data = [
-        ["Insumo", "Massa Seca / Volume", "Massa Corrigida / Depósito"],
-        ["Cimento Portland", f"{consumo['cimento_kg']} kg", f"{consumo['sacos_cimento_50kg']} Sacos (50 kg)"],
-        ["Agregado Miúdo (Areia)", f"{consumo['areia_seca_kg']} kg", f"{consumo['areia_umida_kg']} kg ({consumo['areia_m3']} m³)"],
-        ["Agregado Graúdo (Brita)", f"{consumo['brita_kg']} kg", f"{consumo['brita_kg']} kg ({consumo['brita_m3']} m³)"],
-        ["Água Efetiva", f"{consumo['agua_litros']} Litros", f"{consumo['agua_litros']} Litros"]
+    c = dados["consumo_m3"]
+    c_data = [
+        [Paragraph("<b>Insumo</b>", styles['Normal']), Paragraph("<b>Massa Seca / Vol.</b>", styles['Normal']), Paragraph("<b>Massa Úmida / Embalagem</b>", styles['Normal'])],
+        [Paragraph("Cimento Portland", styles['Normal']), Paragraph(f"{c['cimento_kg']} kg", styles['Normal']), Paragraph(f"{c['sacos_cimento_50kg']} Sacos (50 kg)", styles['Normal'])],
+        [Paragraph("Areia (Agregado Miúdo)", styles['Normal']), Paragraph(f"{c['areia_seca_kg']} kg", styles['Normal']), Paragraph(f"{c['areia_umida_kg']} kg ({c['areia_m3']} m³)", styles['Normal'])],
+        [Paragraph("Brita / Seixo (Agregado Graúdo)", styles['Normal']), Paragraph(f"{c['brita_kg']} kg", styles['Normal']), Paragraph(f"{c['brita_kg']} kg ({c['brita_m3']} m³)", styles['Normal'])],
+        [Paragraph("Água Efetiva a Adicionar", styles['Normal']), Paragraph(f"{c['agua_litros']} Litros", styles['Normal']), Paragraph(f"{c['agua_litros']} Litros", styles['Normal'])]
     ]
 
-    t2 = Table(consumo_data, colWidths=[180, 170, 170])
-    t2.setStyle(TableStyle([
+    t_c = Table(c_data, colWidths=[180, 160, 200])
+    t_c.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#334155')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8FAFC')]),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]))
-    elements.append(t2)
-    elements.append(Spacer(1, 20))
+    elements.append(t_c)
+    elements.append(Spacer(1, 12))
 
-    # Diagnósticos de Engenharia
     if dados["alertas"]:
-        elements.append(Paragraph("3. Diagnóstico de Segurança e Diretrizes de Execução", styles['Heading2']))
-        elements.append(Spacer(1, 8))
-        for alerta in dados["alertas"]:
-            # Remover tags markdown para exibição no PDF
-            alerta_limpo = alerta.replace("**", "").replace("⚠️ ", "").replace("🚨 ", "").replace("🚛 ", "").replace("⏱️ ", "")
-            elements.append(Paragraph(f"• {alerta_limpo}", styles['BodyText']))
-            elements.append(Spacer(1, 4))
+        elements.append(Paragraph("<b>3. Parecer Tecnológico e Advertências Normativas</b>", styles['Heading2']))
+        elements.append(Spacer(1, 6))
+        for alt in dados["alertas"]:
+            clean_alt = alt.replace("**", "").replace("🚨 ", "").replace("⚠️ ", "").replace("🏗️ ", "")
+            elements.append(Paragraph(f"• {clean_alt}", styles['Normal']))
+            elements.append(Spacer(1, 3))
+
+    elements.extend(criar_bloco_assinatura(dados.get("dados_obra", {}), styles))
 
     doc.build(elements)
     buffer.seek(0)
